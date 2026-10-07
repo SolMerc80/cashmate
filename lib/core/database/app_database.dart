@@ -1,27 +1,57 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'tables/transactions.dart';
+import 'tables/categories.dart';
+import 'tables/category_fields.dart';
+import 'tables/category_entries.dart';
+import 'tables/category_entry_values.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Transactions])
+QueryExecutor _openConnection() {
+  return driftDatabase(name: 'cashmate_db');
+}
+
+@DriftDatabase(tables: [
+  Transactions,
+  Categories,
+  CategoryFields,
+  CategoryEntries,
+  CategoryEntryValues,
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2; // ← bumped from 1 to 2
 
-  static QueryExecutor _openConnection() {
-    return driftDatabase(name: 'budget_db');
-  }
+  // ── Queries ──────────────────────────────────────────────────────────────
 
-  // Reactive Stream Query for UI updates
+  /// Returns a live stream of every transaction, newest first.
   Stream<List<Transaction>> watchAllTransactions() {
-    return (select(transactions)..orderBy([(t) => OrderingTerm.desc(t.date)])).watch();
+    return (select(transactions)
+          ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+        .watch();
   }
 
-  // Insert Transaction
-  Future<int> addTransaction(TransactionsCompanion entry) {
-    return into(transactions).insert(entry);
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (Migrator m) async {
+        // Called on fresh installs — creates ALL tables
+        await m.createAll();
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        // Called when existing users update the app
+        if (from < 2) {
+          // Only create the NEW tables added in version 2
+          await m.createTable(categories);
+          await m.createTable(categoryFields);
+          await m.createTable(categoryEntries);
+          await m.createTable(categoryEntryValues);
+        }
+        // Future: if (from < 3) { ... }
+      },
+    );
   }
 }
