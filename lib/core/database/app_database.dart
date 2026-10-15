@@ -5,6 +5,8 @@ import 'tables/categories.dart';
 import 'tables/category_fields.dart';
 import 'tables/category_entries.dart';
 import 'tables/category_entry_values.dart';
+import 'transaction_dao.dart';
+import 'category_dao.dart';
 
 part 'app_database.g.dart';
 
@@ -12,13 +14,19 @@ QueryExecutor _openConnection() {
   return driftDatabase(name: 'cashmate_db');
 }
 
-@DriftDatabase(tables: [
-  Transactions,
-  Categories,
-  CategoryFields,
-  CategoryEntries,
-  CategoryEntryValues,
-])
+@DriftDatabase(
+  tables: [
+    Transactions,
+    Categories,
+    CategoryFields,
+    CategoryEntries,
+    CategoryEntryValues,
+  ],
+  daos: [
+    TransactionDao,
+    CategoryDao,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -33,6 +41,9 @@ class AppDatabase extends _$AppDatabase {
           ..orderBy([(t) => OrderingTerm.desc(t.date)]))
         .watch();
   }
+
+  /// Returns a live stream of every category, ordered by name.
+  Stream<List<Category>> watchAllCategories() => select(categories).watch();
 
   @override
   MigrationStrategy get migration {
